@@ -1,7 +1,8 @@
 {
     "rust-analyzer.linkedProjects": [
         "./lib/Cargo.toml",
-        "./day-1/Cargo.toml"
+        "./day-1/Cargo.toml",
+        "./day-2/Cargo.toml"
     ],
     "[plaintext]": {
         "files.insertFinalNewline": false
