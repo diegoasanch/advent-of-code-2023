@@ -1,25 +1,5 @@
 use thiserror::Error;
 
-/// Represents the count of each color
-#[derive(Debug, PartialEq, Eq)]
-pub enum Color {
-    Red(u8),
-    Green(u8),
-    Blue(u8),
-}
-
-impl Color {
-    pub fn new(record: &str) -> Result<Self, ColorParserError> {
-        let (color, count) = parse_color_count(record)?;
-        match color {
-            "red" => Ok(Color::Red(count)),
-            "green" => Ok(Color::Green(count)),
-            "blue" => Ok(Color::Blue(count)),
-            _ => Err(ColorParserError::InvalidColor(color.to_string())),
-        }
-    }
-}
-
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ColorParserError {
     #[error("Invalid color count record: {0}")]
@@ -30,6 +10,50 @@ pub enum ColorParserError {
 
     #[error("Invalid count: {0}")]
     InvalidCount(String),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ColorCount {
+    pub red: Option<u8>,
+    pub green: Option<u8>,
+    pub blue: Option<u8>,
+}
+
+impl ColorCount {
+    pub fn default() -> Self {
+        Self {
+            red: None,
+            green: None,
+            blue: None,
+        }
+    }
+
+    pub fn new(red: Option<u8>, green: Option<u8>, blue: Option<u8>) -> Self {
+        Self { red, green, blue }
+    }
+
+    pub fn parse(color_counts_str: &str) -> Result<Self, ColorParserError> {
+        parse_color_counts(color_counts_str)
+    }
+}
+
+/// Parses colors into a color count
+fn parse_color_counts(color_counts_str: &str) -> Result<ColorCount, ColorParserError> {
+    let mut color_records = color_counts_str.split(",");
+    let mut result = ColorCount::default();
+    color_records.try_for_each(|record| match parse_color_count(record) {
+        Ok((color, count)) => {
+            match color {
+                "red" => result.red = Some(count),
+                "green" => result.green = Some(count),
+                "blue" => result.blue = Some(count),
+                _ => return Err(ColorParserError::InvalidColor(color.to_string())),
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
+    })?;
+    Ok(result)
 }
 
 /// Parses a color count record into a color and count
@@ -47,12 +71,15 @@ fn parse_color_count(record: &str) -> Result<(&str, u8), ColorParserError> {
             Err(ColorParserError::InvalidCount(
                 count_str
                     .unwrap_or_else(|| "Value not provided")
+                    .trim()
                     .to_string(),
             ))
         })?;
         Ok((color, count))
     } else {
-        Err(ColorParserError::InvalidColorCount(record.to_string()))
+        Err(ColorParserError::InvalidColorCount(
+            record.trim().to_string(),
+        ))
     }
 }
 
@@ -61,45 +88,35 @@ mod test {
     use super::*;
 
     #[test]
-    fn creates_red_color() {
-        let record = "1 red";
-        let color = Color::new(record).unwrap();
-        assert_eq!(color, Color::Red(1));
+    fn parses_a_valid_colors_string() {
+        let colors_str = "1 red, 2 green, 3 blue";
+        let color_count = parse_color_counts(colors_str).unwrap();
+        assert_eq!(
+            color_count,
+            ColorCount {
+                red: Some(1),
+                green: Some(2),
+                blue: Some(3)
+            }
+        );
     }
 
     #[test]
-    fn creates_green_color() {
-        let record = "2 green";
-        let color = Color::new(record).unwrap();
-        assert_eq!(color, Color::Green(2));
-    }
-
-    #[test]
-    fn creates_blue_color() {
-        let record = "3 blue";
-        let color = Color::new(record).unwrap();
-        assert_eq!(color, Color::Blue(3));
-    }
-
-    #[test]
-    fn fails_to_create_color_with_invalid_color() {
-        let record = "1 yellow";
-        let result = Color::new(record);
+    fn fails_on_invalid_colors_string() {
+        let colors_str = "1 red, 2 green, 3 yellow";
+        let result = parse_color_counts(colors_str);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
             ColorParserError::InvalidColor("yellow".to_string())
         );
-    }
 
-    #[test]
-    fn fails_to_create_color_with_invalid_count() {
-        let record = "five red";
-        let result = Color::new(record);
+        let colors_str = "1 red, 2 green, 3";
+        let result = parse_color_counts(colors_str);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            ColorParserError::InvalidCount("five".to_string())
+            ColorParserError::InvalidColorCount("3".to_string())
         );
     }
 

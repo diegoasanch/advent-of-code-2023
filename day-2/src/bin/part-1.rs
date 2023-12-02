@@ -1,6 +1,9 @@
 use std::process::ExitCode;
 
-use day_2::game::{is_game_valid, ColorCount, Game};
+use day_2::{
+    color::ColorCount,
+    game::{is_game_valid, Game},
+};
 use lib::input::read_file_lines;
 
 fn main() -> ExitCode {
