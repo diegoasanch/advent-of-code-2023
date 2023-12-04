@@ -59,6 +59,26 @@ impl ColorCount {
     pub fn all_some(&self) -> bool {
         self.red.is_some() && self.green.is_some() && self.blue.is_some()
     }
+
+    pub fn get(&self, color: &Color) -> Option<u16> {
+        match color {
+            Color::Red => self.red,
+            Color::Green => self.green,
+            Color::Blue => self.blue,
+        }
+    }
+
+    pub fn set(&mut self, color: &Color, count: Option<u16>) {
+        match color {
+            Color::Red => self.red = count,
+            Color::Green => self.green = count,
+            Color::Blue => self.blue = count,
+        }
+    }
+
+    pub fn gt(&self, other: &Self, color: &Color) -> bool {
+        self.get(color).unwrap_or(0) > other.get(color).unwrap_or(0)
+    }
 }
 
 /// Parses colors into a color count

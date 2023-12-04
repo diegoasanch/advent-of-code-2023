@@ -2,7 +2,7 @@ use std::vec;
 
 use thiserror::Error;
 
-use crate::color::ColorCount;
+use crate::color::{self, Color, ColorCount};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Game {
@@ -18,54 +18,35 @@ impl Game {
     pub fn parse(game_str: &str) -> Result<Self, GameParserError> {
         parse_game_str(game_str)
     }
+
+    /// Determines if a game is valid
+    /// Validation criteria:
+    /// - All rounds must be valid
+    pub fn is_valid(&self, available: &ColorCount) -> bool {
+        self.rounds
+            .iter()
+            .all(|round| is_round_valid(round, available))
+    }
 }
 
-/// Determines if a game is valid
-/// Validation criteria:
-/// - All rounds must be valid
-pub fn is_game_valid(game: &Game, available: &ColorCount) -> bool {
-    game.rounds
-        .iter()
-        .all(|round| is_round_valid(round, available))
-}
-
-/// Finds the minimum color match for a game
+/// Finds the minimum amount of colors required to pass a game
 /// A color match is a color count that is less than or equal to the available count of that color
 /// The matches are searched for in the RGB order on each game round
-pub fn min_color_match(game: &Game, available: &ColorCount) -> Option<ColorCount> {
+pub fn min_color_match(game: &Game) -> Option<ColorCount> {
     let mut result = ColorCount::default();
+    let colors = vec![Color::Red, Color::Green, Color::Blue];
 
     for round in game.rounds.iter() {
-        if result.red.is_none() {
-            result.red = get_if_below_threshold(round.red, available.red);
-        }
-        if result.red.is_some() && result.green.is_none() {
-            result.green = get_if_below_threshold(round.green, available.green);
-        }
-        if result.green.is_some() && result.blue.is_none() {
-            result.blue = get_if_below_threshold(round.blue, available.blue);
-        }
-        if result.all_some() {
-            break;
+        for color in colors.iter() {
+            if round.gt(&result, color) {
+                result.set(color, round.get(color));
+            }
         }
     }
     if result.all_some() {
         return Some(result);
     }
     None
-}
-
-fn get_if_below_threshold(value: Option<u16>, threshold: Option<u16>) -> Option<u16> {
-    match (value, threshold) {
-        (Some(value), Some(threshold)) => {
-            if value < threshold {
-                Some(value)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
 }
 
 /// Determines if a round is valid
@@ -199,18 +180,31 @@ mod test {
 
     /// Example from the Advent of Code website
     #[test]
-    fn gets_minimum() {
-        let available_colors = ColorCount::new(Some(12), Some(13), Some(14), None);
+    fn gets_minimum_game_1() {
         let game_1_str = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green";
         let game_1 = Game::parse(game_1_str).unwrap();
 
-        let result = min_color_match(&game_1, &available_colors).unwrap();
+        let result = min_color_match(&game_1).unwrap();
         assert_eq!(result, ColorCount::new(Some(4), Some(2), Some(6), None));
+    }
 
+    /// Example from the Advent of Code website
+    #[test]
+    fn gets_minimum_game_3() {
+        let game_3_str = "Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red";
+        let game_3 = Game::parse(game_3_str).unwrap();
+
+        let result = min_color_match(&game_3).unwrap();
+        assert_eq!(result, ColorCount::new(Some(20), Some(13), Some(6), None));
+    }
+
+    /// Example from the Advent of Code website
+    #[test]
+    fn gets_minimum_game_5() {
         let game_5_str = "Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
         let game_5 = Game::parse(game_5_str).unwrap();
 
-        let result = min_color_match(&game_5, &available_colors).unwrap();
+        let result = min_color_match(&game_5).unwrap();
         assert_eq!(result, ColorCount::new(Some(6), Some(3), Some(2), None));
     }
 }

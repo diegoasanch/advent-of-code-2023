@@ -1,9 +1,6 @@
 use std::process::ExitCode;
 
-use day_2::{
-    color::ColorCount,
-    game::{is_game_valid, Game},
-};
+use day_2::{color::ColorCount, game::Game};
 use lib::input::read_file_lines;
 
 fn main() -> ExitCode {
@@ -42,7 +39,7 @@ fn day_1_logic(game_lines: &Vec<String>, available_colors: &ColorCount) -> Resul
             }
         };
 
-        if is_game_valid(&game, &available_colors) {
+        if game.is_valid(&available_colors) {
             win_id_sum += game.id;
         }
     }
