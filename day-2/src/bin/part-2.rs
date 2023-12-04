@@ -1,12 +1,11 @@
 use std::process::ExitCode;
 
-use day_2::{color::ColorSet, game::Game};
+use day_2::game::Game;
 use lib::input::read_file_lines;
 
 fn main() -> ExitCode {
     // let path = "./inputs/test.txt";
     let path = "./inputs/part-1.txt";
-    let available_colors = ColorSet::new(Some(12), Some(13), Some(14));
 
     let lines = match read_file_lines(path) {
         Ok(lines) => lines,
@@ -16,7 +15,7 @@ fn main() -> ExitCode {
         }
     };
 
-    match day_1_logic(&lines, &available_colors) {
+    match day_2_logic(&lines) {
         Ok(win_id_sum) => {
             println!("Sum of winning ids: {}", win_id_sum);
             return ExitCode::SUCCESS;
@@ -28,8 +27,8 @@ fn main() -> ExitCode {
     };
 }
 
-fn day_1_logic(game_lines: &Vec<String>, available_colors: &ColorSet) -> Result<u32, String> {
-    let mut win_id_sum = 0;
+fn day_2_logic(game_lines: &Vec<String>) -> Result<u32, String> {
+    let mut min_game_sum = 0;
 
     for line in game_lines.iter() {
         let game = match Game::parse(line) {
@@ -39,12 +38,13 @@ fn day_1_logic(game_lines: &Vec<String>, available_colors: &ColorSet) -> Result<
             }
         };
 
-        if game.is_valid(&available_colors) {
-            win_id_sum += game.id;
-        }
+        min_game_sum += game
+            .min_color_match()
+            .ok_or_else(|| "No valid color match found".to_string())?
+            .power();
     }
 
-    return Ok(win_id_sum);
+    return Ok(min_game_sum);
 }
 
 #[cfg(test)]
@@ -62,8 +62,8 @@ mod tests {
             "Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red".to_string(),
             "Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green".to_string(),
         ];
-        let available_colors = ColorSet::new(Some(12), Some(13), Some(14));
-        let win_id_sum = day_1_logic(&website_example_input, &available_colors).unwrap();
-        assert_eq!(win_id_sum, 8);
+
+        let min_game_power_sum = day_2_logic(&website_example_input).unwrap();
+        assert_eq!(min_game_power_sum, 2286);
     }
 }

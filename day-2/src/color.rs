@@ -19,28 +19,22 @@ pub enum Color {
     Blue,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct ColorCount {
-    pub red: Option<u16>,
-    pub green: Option<u16>,
-    pub blue: Option<u16>,
+type ColorCount = u16;
 
-    pub order: Vec<Color>,
+#[derive(Debug, PartialEq, Eq)]
+pub struct ColorSet {
+    pub red: Option<ColorCount>,
+    pub green: Option<ColorCount>,
+    pub blue: Option<ColorCount>,
 }
 
-impl ColorCount {
+impl ColorSet {
     pub fn new(
-        red: Option<u16>,
-        green: Option<u16>,
-        blue: Option<u16>,
-        order: Option<Vec<Color>>,
+        red: Option<ColorCount>,
+        green: Option<ColorCount>,
+        blue: Option<ColorCount>,
     ) -> Self {
-        Self {
-            red,
-            green,
-            blue,
-            order: order.unwrap_or_else(|| vec![]),
-        }
+        Self { red, green, blue }
     }
 
     pub fn default() -> Self {
@@ -48,19 +42,34 @@ impl ColorCount {
             red: None,
             green: None,
             blue: None,
-            order: vec![],
         }
     }
 
     pub fn parse(color_counts_str: &str) -> Result<Self, ColorParserError> {
-        parse_color_counts(color_counts_str)
+        let mut color_records = color_counts_str.split(",");
+        let mut result = ColorSet::default();
+
+        color_records.try_for_each(|record| match parse_color_count(record) {
+            Ok((color, count)) => {
+                match color {
+                    "red" => result.red = Some(count),
+
+                    "green" => result.green = Some(count),
+                    "blue" => result.blue = Some(count),
+                    _ => return Err(ColorParserError::InvalidColor(color.to_string())),
+                }
+                Ok(())
+            }
+            Err(e) => Err(e),
+        })?;
+        Ok(result)
     }
 
     pub fn all_some(&self) -> bool {
         self.red.is_some() && self.green.is_some() && self.blue.is_some()
     }
 
-    pub fn get(&self, color: &Color) -> Option<u16> {
+    pub fn get(&self, color: &Color) -> Option<ColorCount> {
         match color {
             Color::Red => self.red,
             Color::Green => self.green,
@@ -68,7 +77,7 @@ impl ColorCount {
         }
     }
 
-    pub fn set(&mut self, color: &Color, count: Option<u16>) {
+    pub fn set(&mut self, color: &Color, count: Option<ColorCount>) {
         match color {
             Color::Red => self.red = count,
             Color::Green => self.green = count,
@@ -76,44 +85,30 @@ impl ColorCount {
         }
     }
 
-    pub fn gt(&self, other: &Self, color: &Color) -> bool {
+    pub fn gt_color(&self, other: &Self, color: &Color) -> bool {
         self.get(color).unwrap_or(0) > other.get(color).unwrap_or(0)
     }
-}
 
-/// Parses colors into a color count
-fn parse_color_counts(color_counts_str: &str) -> Result<ColorCount, ColorParserError> {
-    let mut color_records = color_counts_str.split(",");
-    let mut result = ColorCount::default();
+    /// Determines if this color count is greater than the other color count
+    /// for all colors
+    pub fn gt(&self, other: &Self) -> bool {
+        self.gt_color(other, &Color::Red)
+            && self.gt_color(other, &Color::Green)
+            && self.gt_color(other, &Color::Blue)
+    }
 
-    color_records.try_for_each(|record| match parse_color_count(record) {
-        Ok((color, count)) => {
-            match color {
-                "red" => {
-                    result.red = Some(count);
-                    result.order.push(Color::Red);
-                }
-                "green" => {
-                    result.green = Some(count);
-                    result.order.push(Color::Green)
-                }
-                "blue" => {
-                    result.blue = Some(count);
-                    result.order.push(Color::Blue)
-                }
-                _ => return Err(ColorParserError::InvalidColor(color.to_string())),
-            }
-            Ok(())
-        }
-        Err(e) => Err(e),
-    })?;
-    Ok(result)
+    /// Count of each color multiplied together
+    pub fn power(&self) -> u32 {
+        self.red.unwrap_or(0) as u32
+            * self.green.unwrap_or(0) as u32
+            * self.blue.unwrap_or(0) as u32
+    }
 }
 
 /// Parses a color count record into a color and count
 /// The record should be in the format: <count> <color>
 /// For example: 1 red
-fn parse_color_count(record: &str) -> Result<(&str, u16), ColorParserError> {
+fn parse_color_count(record: &str) -> Result<(&str, ColorCount), ColorParserError> {
     let mut parts = record.trim().split(" ");
     let count_str = parts.next();
     let color_str = parts.next();
@@ -121,7 +116,7 @@ fn parse_color_count(record: &str) -> Result<(&str, u16), ColorParserError> {
     // Extract the count and color parts
     if let (Some(count), Some(color)) = (count_str, color_str) {
         // Parse the count
-        let count = count.parse::<u16>().or_else(|_| {
+        let count = count.parse::<ColorCount>().or_else(|_| {
             Err(ColorParserError::InvalidCount(
                 count_str
                     .unwrap_or_else(|| "Value not provided")
@@ -144,22 +139,14 @@ mod test {
     #[test]
     fn parses_a_valid_colors_string() {
         let colors_str = "1 red, 2 green, 3 blue";
-        let color_count = parse_color_counts(colors_str).unwrap();
-        assert_eq!(
-            color_count,
-            ColorCount::new(
-                Some(1),
-                Some(2),
-                Some(3),
-                Some(vec![Color::Red, Color::Green, Color::Blue])
-            )
-        );
+        let color_count = ColorSet::parse(colors_str).unwrap();
+        assert_eq!(color_count, ColorSet::new(Some(1), Some(2), Some(3),));
     }
 
     #[test]
     fn fails_on_invalid_colors_string() {
         let colors_str = "1 red, 2 green, 3 yellow";
-        let result = parse_color_counts(colors_str);
+        let result = ColorSet::parse(colors_str);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -167,7 +154,7 @@ mod test {
         );
 
         let colors_str = "1 red, 2 green, 3";
-        let result = parse_color_counts(colors_str);
+        let result = ColorSet::parse(colors_str);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
