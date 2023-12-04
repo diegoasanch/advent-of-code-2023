@@ -13,27 +13,51 @@ pub enum ColorParserError {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub struct ColorCount {
-    pub red: Option<u8>,
-    pub green: Option<u8>,
-    pub blue: Option<u8>,
+    pub red: Option<u16>,
+    pub green: Option<u16>,
+    pub blue: Option<u16>,
+
+    pub order: Vec<Color>,
 }
 
 impl ColorCount {
+    pub fn new(
+        red: Option<u16>,
+        green: Option<u16>,
+        blue: Option<u16>,
+        order: Option<Vec<Color>>,
+    ) -> Self {
+        Self {
+            red,
+            green,
+            blue,
+            order: order.unwrap_or_else(|| vec![]),
+        }
+    }
+
     pub fn default() -> Self {
         Self {
             red: None,
             green: None,
             blue: None,
+            order: vec![],
         }
-    }
-
-    pub fn new(red: Option<u8>, green: Option<u8>, blue: Option<u8>) -> Self {
-        Self { red, green, blue }
     }
 
     pub fn parse(color_counts_str: &str) -> Result<Self, ColorParserError> {
         parse_color_counts(color_counts_str)
+    }
+
+    pub fn all_some(&self) -> bool {
+        self.red.is_some() && self.green.is_some() && self.blue.is_some()
     }
 }
 
@@ -41,12 +65,22 @@ impl ColorCount {
 fn parse_color_counts(color_counts_str: &str) -> Result<ColorCount, ColorParserError> {
     let mut color_records = color_counts_str.split(",");
     let mut result = ColorCount::default();
+
     color_records.try_for_each(|record| match parse_color_count(record) {
         Ok((color, count)) => {
             match color {
-                "red" => result.red = Some(count),
-                "green" => result.green = Some(count),
-                "blue" => result.blue = Some(count),
+                "red" => {
+                    result.red = Some(count);
+                    result.order.push(Color::Red);
+                }
+                "green" => {
+                    result.green = Some(count);
+                    result.order.push(Color::Green)
+                }
+                "blue" => {
+                    result.blue = Some(count);
+                    result.order.push(Color::Blue)
+                }
                 _ => return Err(ColorParserError::InvalidColor(color.to_string())),
             }
             Ok(())
@@ -59,7 +93,7 @@ fn parse_color_counts(color_counts_str: &str) -> Result<ColorCount, ColorParserE
 /// Parses a color count record into a color and count
 /// The record should be in the format: <count> <color>
 /// For example: 1 red
-fn parse_color_count(record: &str) -> Result<(&str, u8), ColorParserError> {
+fn parse_color_count(record: &str) -> Result<(&str, u16), ColorParserError> {
     let mut parts = record.trim().split(" ");
     let count_str = parts.next();
     let color_str = parts.next();
@@ -67,7 +101,7 @@ fn parse_color_count(record: &str) -> Result<(&str, u8), ColorParserError> {
     // Extract the count and color parts
     if let (Some(count), Some(color)) = (count_str, color_str) {
         // Parse the count
-        let count = count.parse::<u8>().or_else(|_| {
+        let count = count.parse::<u16>().or_else(|_| {
             Err(ColorParserError::InvalidCount(
                 count_str
                     .unwrap_or_else(|| "Value not provided")
@@ -93,11 +127,12 @@ mod test {
         let color_count = parse_color_counts(colors_str).unwrap();
         assert_eq!(
             color_count,
-            ColorCount {
-                red: Some(1),
-                green: Some(2),
-                blue: Some(3)
-            }
+            ColorCount::new(
+                Some(1),
+                Some(2),
+                Some(3),
+                Some(vec![Color::Red, Color::Green, Color::Blue])
+            )
         );
     }
 

@@ -1,3 +1,5 @@
+use std::vec;
+
 use thiserror::Error;
 
 use crate::color::ColorCount;
@@ -25,6 +27,45 @@ pub fn is_game_valid(game: &Game, available: &ColorCount) -> bool {
     game.rounds
         .iter()
         .all(|round| is_round_valid(round, available))
+}
+
+/// Finds the minimum color match for a game
+/// A color match is a color count that is less than or equal to the available count of that color
+/// The matches are searched for in the RGB order on each game round
+pub fn min_color_match(game: &Game, available: &ColorCount) -> Option<ColorCount> {
+    let mut result = ColorCount::default();
+
+    for round in game.rounds.iter() {
+        if result.red.is_none() {
+            result.red = get_if_below_threshold(round.red, available.red);
+        }
+        if result.red.is_some() && result.green.is_none() {
+            result.green = get_if_below_threshold(round.green, available.green);
+        }
+        if result.green.is_some() && result.blue.is_none() {
+            result.blue = get_if_below_threshold(round.blue, available.blue);
+        }
+        if result.all_some() {
+            break;
+        }
+    }
+    if result.all_some() {
+        return Some(result);
+    }
+    None
+}
+
+fn get_if_below_threshold(value: Option<u16>, threshold: Option<u16>) -> Option<u16> {
+    match (value, threshold) {
+        (Some(value), Some(threshold)) => {
+            if value < threshold {
+                Some(value)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Determines if a round is valid
@@ -94,21 +135,24 @@ fn parse_game_str(game_str: &str) -> Result<Game, GameParserError> {
 
 #[cfg(test)]
 mod test {
+    use crate::color::Color;
+
     use super::*;
 
     #[test]
     fn parses_a_valid_game_string() {
-        let game_str = "Game 1: 1 red, 2 green, 3 blue";
+        let game_str = "Game 1: 1 red, 3 blue, 2 green";
         let game = parse_game_str(game_str).unwrap();
         assert_eq!(
             game,
             Game::new(
                 1,
-                vec![ColorCount {
-                    red: Some(1),
-                    green: Some(2),
-                    blue: Some(3)
-                }]
+                vec![ColorCount::new(
+                    Some(1),
+                    Some(2),
+                    Some(3),
+                    Some(vec![Color::Red, Color::Blue, Color::Green])
+                )]
             )
         );
     }
@@ -122,16 +166,18 @@ mod test {
             Game::new(
                 1,
                 vec![
-                    ColorCount {
-                        red: Some(1),
-                        green: Some(2),
-                        blue: Some(3)
-                    },
-                    ColorCount {
-                        red: Some(4),
-                        green: Some(5),
-                        blue: Some(6)
-                    }
+                    ColorCount::new(
+                        Some(1),
+                        Some(2),
+                        Some(3),
+                        Some(vec![Color::Red, Color::Green, Color::Blue])
+                    ),
+                    ColorCount::new(
+                        Some(4),
+                        Some(5),
+                        Some(6),
+                        Some(vec![Color::Red, Color::Green, Color::Blue])
+                    ),
                 ]
             )
         );
@@ -139,31 +185,32 @@ mod test {
 
     #[test]
     fn round_is_valid() {
-        let round = ColorCount {
-            red: Some(1),
-            green: Some(2),
-            blue: Some(3),
-        };
-        let available = ColorCount {
-            red: Some(1),
-            green: Some(2),
-            blue: Some(3),
-        };
+        let round = ColorCount::new(Some(1), Some(2), Some(3), None);
+        let available = ColorCount::new(Some(1), Some(2), Some(3), None);
         assert!(is_round_valid(&round, &available));
     }
 
     #[test]
     fn round_is_invalid() {
-        let round = ColorCount {
-            red: Some(1),
-            green: Some(2),
-            blue: Some(3),
-        };
-        let available = ColorCount {
-            red: Some(1),
-            green: Some(2),
-            blue: Some(2),
-        };
+        let round = ColorCount::new(Some(1), Some(2), Some(3), None);
+        let available = ColorCount::new(Some(1), Some(2), Some(2), None);
         assert!(!is_round_valid(&round, &available));
+    }
+
+    /// Example from the Advent of Code website
+    #[test]
+    fn gets_minimum() {
+        let available_colors = ColorCount::new(Some(12), Some(13), Some(14), None);
+        let game_1_str = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green";
+        let game_1 = Game::parse(game_1_str).unwrap();
+
+        let result = min_color_match(&game_1, &available_colors).unwrap();
+        assert_eq!(result, ColorCount::new(Some(4), Some(2), Some(6), None));
+
+        let game_5_str = "Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
+        let game_5 = Game::parse(game_5_str).unwrap();
+
+        let result = min_color_match(&game_5, &available_colors).unwrap();
+        assert_eq!(result, ColorCount::new(Some(6), Some(3), Some(2), None));
     }
 }
