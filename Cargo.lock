@@ -18,6 +18,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "day-3"
+version = "0.1.0"
+dependencies = [
+ "lib",
+ "thiserror",
+]
+
+[[package]]
 name = "lib"
 version = "0.1.0"
 

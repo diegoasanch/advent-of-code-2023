@@ -30,5 +30,5 @@ fn main() -> ExitCode {
 fn part_1_logic(game_lines: &Vec<String>) -> Result<u32, String> {
     let schematic = Schematic::parse(game_lines)
         .or_else(|err| Err(format!("Error parsing the schematic: {}", err.to_string())))?;
-    Ok(schematic.part_numbers.iter().sum())
+    Ok(schematic.get_part_numbers().iter().sum())
 }
