@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -83,6 +85,49 @@ impl Schematic {
             .map(|num| num.value)
             .collect()
     }
+
+    pub fn get_gear_adjacent_parts(&self) -> Vec<&Num> {
+        self.parts
+            .iter()
+            .filter(|num| match &num.adjacent_symbol {
+                Some(symbol) => symbol.character == '*',
+                None => false,
+            })
+            .collect()
+    }
+
+    pub fn get_gear_pairs(&self) -> Vec<(&Num, &Num)> {
+        let mut pairs = Vec::new();
+        let gear_parts = self.get_gear_adjacent_parts();
+        let mut adjacent_gear_parts = HashMap::<(usize, usize), Vec<&&Num>>::new();
+
+        for part in gear_parts.iter() {
+            if let Some(symbol) = &part.adjacent_symbol {
+                let gear_position = (symbol.pos_x, symbol.pos_y);
+                match adjacent_gear_parts.get_mut(&gear_position) {
+                    Some(parts) => parts.push(part),
+                    None => {
+                        adjacent_gear_parts.insert(gear_position, vec![part]);
+                    }
+                }
+            }
+        }
+        for (_, parts) in adjacent_gear_parts.iter() {
+            if parts.len() == 2 {
+                pairs.push((*parts[0], *parts[1]));
+            }
+        }
+        pairs
+    }
+
+    pub fn get_gear_ratios_sum(&self) -> u32 {
+        let mut total = 0;
+        let pairs = self.get_gear_pairs();
+        for pair in pairs.iter() {
+            total += pair.0.value * pair.1.value;
+        }
+        total
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -137,6 +182,21 @@ fn get_check_position(position: usize, check_position: &CheckPosition) -> Option
 mod test {
     use super::*;
 
+    fn get_example_lines() -> Vec<String> {
+        vec![
+            "467..114..".to_string(),
+            "...*......".to_string(),
+            "..35..633.".to_string(),
+            "......#...".to_string(),
+            "617*......".to_string(),
+            ".....+.58.".to_string(),
+            "..592.....".to_string(),
+            "......755.".to_string(),
+            "...$.*....".to_string(),
+            ".664.598..".to_string(),
+        ]
+    }
+
     #[test]
     fn test_is_part() {
         let lines = vec!["467..114..".to_string(), "...*......".to_string()];
@@ -163,18 +223,7 @@ mod test {
     /// Test from the website's problem description
     #[test]
     fn parses_full_schematic() {
-        let lines = vec![
-            "467..114..".to_string(),
-            "...*......".to_string(),
-            "..35..633.".to_string(),
-            "......#...".to_string(),
-            "617*......".to_string(),
-            ".....+.58.".to_string(),
-            "..592.....".to_string(),
-            "......755.".to_string(),
-            "...$.*....".to_string(),
-            ".664.598..".to_string(),
-        ];
+        let lines = get_example_lines();
 
         let result = Schematic::parse(&lines).unwrap();
         assert_eq!(
@@ -182,5 +231,39 @@ mod test {
             vec![467, 35, 633, 617, 592, 755, 664, 598]
         );
         assert_eq!(result.get_non_part_numbers(), vec![114, 58]);
+    }
+
+    #[test]
+    fn gets_gear_numbers() {
+        let lines = get_example_lines();
+
+        let result = Schematic::parse(&lines).unwrap();
+        let parts = result.get_gear_adjacent_parts();
+        let nums = parts.iter().map(|num| num.value).collect::<Vec<u32>>();
+        assert_eq!(parts.len(), 5);
+        assert_eq!(nums, vec![467, 35, 617, 755, 598]);
+    }
+
+    #[test]
+    fn gets_gear_pairs() {
+        let lines = get_example_lines();
+
+        let result = Schematic::parse(&lines).unwrap();
+        let pairs = result.get_gear_pairs();
+
+        let pairs = pairs
+            .iter()
+            .map(|pair| (pair.0.value, pair.1.value))
+            .collect::<Vec<(u32, u32)>>();
+
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs, vec![(467, 35), (755, 598)]);
+    }
+
+    #[test]
+    fn gets_gear_ratios_sum() {
+        let lines = get_example_lines();
+        let result = Schematic::parse(&lines).unwrap();
+        assert_eq!(result.get_gear_ratios_sum(), 467835);
     }
 }
